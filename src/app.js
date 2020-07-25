@@ -8,40 +8,70 @@ import Youch from 'youch';
 import 'express-async-errors';
 import sentryConfig from './config/sentry';
 import routes from './routes';
+import io from 'socket.io';
+import http from 'http';
 
 import './database';
+import { next } from 'sucrase/dist/parser/tokenizer';
 
 class App {
   constructor() {
-    this.server = express();
+    this.app = express();
+    // pegando o protocolo http que está dentro do express
+    this.server = http.Server(this.app);
 
     // inicializando o responsável por visualizar os erros do projeto
     Sentry.init(sentryConfig);
 
+    this.socket();
+
     this.midedlewares();
     this.routes();
     this.exceptionHandler();
+
+    this.connectedUsers = {};
+  }
+
+  socket() {
+    this.io = io(this.server);
+
+    //escutando os eventos dentro do io
+    this.io.on('connection', socket => {
+      const { user_id } = socket.handshake.query;
+      this.connectedUsers[user_id] = socket.id;
+
+      socket.on('disconnect', () => {
+        delete this.connectedUsers[user_id];
+      });
+    });
   }
 
   midedlewares() {
     // o midedlewar do sentry tem que está acima do todos dos midedle do projeto
-    this.server.use(Sentry.Handlers.requestHandler());
-    this.server.use(cors());
-    this.server.use(express.json());
-    this.server.use(
+    this.app.use(Sentry.Handlers.requestHandler());
+    this.app.use(cors());
+    this.app.use(express.json());
+    this.app.use(
       '/files',
       express.static(path.resolve(__dirname, '..', 'tmp', 'uploads'))
     );
+
+    this.app.use((req, res, next) => {
+      req.io = this.io;
+      req.connectedUsers = this.connectedUsers;
+
+      next();
+    });
   }
 
   routes() {
-    this.server.use(routes);
+    this.app.use(routes);
     // o midedlewar do sentry tem que está depois de todas as rotas
-    this.server.use(Sentry.Handlers.errorHandler());
+    this.app.use(Sentry.Handlers.errorHandler());
   }
 
   exceptionHandler() {
-    this.server.use(async (error, req, res, next) => {
+    this.app.use(async (error, req, res, next) => {
       if (process.env.NODE_ENV === 'development') {
         const errors = await new Youch(error, req).toJSON();
 
