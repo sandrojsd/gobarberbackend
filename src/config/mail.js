@@ -7,6 +7,6 @@ export default {
     pass: process.env.MAIL_PORT,
   },
   default: {
-    from: 'Equipe GoBarbar <nopley@gobarber.com',
+    from: 'Equipe GoBarbar <nopley@gobarber.com>',
   },
 };

@@ -12,7 +12,6 @@ import io from 'socket.io';
 import http from 'http';
 
 import './database';
-import { next } from 'sucrase/dist/parser/tokenizer';
 
 class App {
   constructor() {

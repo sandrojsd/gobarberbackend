@@ -7,17 +7,6 @@ import auth from '../../config/auth';
 
 class SessionController {
   async store(req, res) {
-    const schema = Yup.object().shape({
-      email: Yup.string()
-        .required()
-        .email(),
-      password: Yup.string().required(),
-    });
-
-    if (!(await schema.isValid(req.body))) {
-      return res.status(400).json({ error: 'Informe o login e a senha!' });
-    }
-
     const { email, password } = req.body;
 
     const user = await User.findOne({
