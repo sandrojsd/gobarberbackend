@@ -3,6 +3,10 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
+import helmet from 'helmet';
+import redis from 'redis';
+import RateLimit from 'express-rate-limit';
+import RateLimitRedis from 'rate-limit-redis';
 import * as Sentry from '@sentry/node';
 import Youch from 'youch';
 import 'express-async-errors';
@@ -48,12 +52,28 @@ class App {
   midedlewares() {
     // o midedlewar do sentry tem que está acima do todos dos midedle do projeto
     this.app.use(Sentry.Handlers.requestHandler());
-    this.app.use(cors());
+    this.app.use(helmet());
+    this.app.use(cors({
+      origin: false,
+    }));
     this.app.use(express.json());
     this.app.use(
       '/files',
       express.static(path.resolve(__dirname, '..', 'tmp', 'uploads'))
     );
+
+    if(process.env.NODE_ENV !== 'development'){
+      this.app.use(new RateLimit({
+        store: new RateLimitRedis({
+          client: redis.createClient({
+            host: process.env.REDIS_HOST,
+            port: process.env.REDIS_PORT,
+          })
+        }),
+        windowMs: 1000 * 60 * 15, //15 minutos
+        max: 100,
+      }));
+    }
 
     this.app.use((req, res, next) => {
       req.io = this.io;
